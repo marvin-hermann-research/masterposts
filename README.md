@@ -9,14 +9,11 @@ They are designed as long-term references, learning logs, and documentation of p
 
 ## 📚 Index
 
-### 🔹 [ROS Masterpost](./ros_masterpost.md)  
+### 🔹 [ROS Masterpost](./ros2_engineering_notes.md)  
 A deep dive into the Robot Operating System (ROS2): architecture, node lifecycle, message types, practical examples, and development patterns.
 
-### 🔹 [Python Masterpost](./python_masterpost.md)  
+### 🔹 [Python Masterpost](./python_for_robotic_engineering.md)  
 Foundational Python knowledge for scientific programming and robotics: idioms, design patterns, tools, and real-world code snippets.
-
-### 🔹 [AI Fundamentals](./ki_fundamentals.md)  
-An ongoing overview of fundamental Artificial Intelligence concepts: from search and optimization to probabilistic reasoning and learning algorithms. Includes references to classic papers and textbooks.
 
 ---
 
