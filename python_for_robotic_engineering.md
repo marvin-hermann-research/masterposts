@@ -1,5 +1,4 @@
-#Python for Robotics Engineering and Cognitive Architectures
-
+# Python for Robotics Engineering and Cognitive Architectures
 ---
 
 ## Why Python?
@@ -434,6 +433,7 @@ pip install py_trees
 
 ### General organization
 
+```bash
 my_project/
 ├── nodes/
 │   ├── condition_is_grounded.py
@@ -444,7 +444,7 @@ my_project/
 ├── sensor_writer.py
 ├── target_writer.py
 ├── main.py
-
+```
 ### Condition Nodes &  Read/Write Clients
 
 Condition nodes are responsible for **checking variables** that determine whether a behavior tree transition should be triggered
@@ -670,11 +670,13 @@ Each tree node decides **what to do next**, based on structural rules and runtim
 In most setups, the **root node** is a `Selector`, which acts as the central decision-maker
 It attempts each of its children **in order**, and selects the **first one** whose internal condition returns `SUCCESS`
 
+```bash
 RootSelector
 ├── Combat Mode
 ├── Charge Battery
 ├── Explore
 └── Idle
+```
 
 > Only the **first successful path** is ticked. Remaining branches are skipped unless the current one fails in future ticks
 
@@ -683,12 +685,13 @@ This makes selectors ideal for building **priority-based fallback systems**
 ---
 ### Example: Combat Mode as a Sequence
 
+```bash
 Sequence("Combat Mode")
 ├── Condition: Enemy Detected
 ├── Selector
 │   ├── Use Ranged
 │   └── Use Melee
-
+```
 - If `Enemy Detected` returns `FAILURE`, the entire sequence halts
 - If it returns `SUCCESS`, the inner selector ticks and evaluates its options:  
     It may choose `Use Ranged` or `Use Melee`, depending on availability or cooldowns
@@ -723,7 +726,7 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 ## Change Log
 
-**Last Updated: 25.07.15**  
+**Last Updated: 2025.07.15**  
 - Added **clarification** on how to access blackboard clients as `Writers` when working with `py_trees`
 - Added **installation note**: `py_trees` must be installed via `pip`
 - Implemented a **condition check** for the loop labeled `"all"` to improve control flow logic
