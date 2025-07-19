@@ -1,4 +1,69 @@
 # Python for Robotics Engineering and Cognitive Architectures
+
+## Table of Contents
+
+## Table of Contents
+
+## Table of Contents
+
+- [Why Python?](#why-python)
+- [Environment Setup](#environment-setup)
+  - [Create a virtual environment](#create-a-virtual-environment)
+  - [Activate the environment (Linux/macOS)](#activate-the-environment-linuxmacos)
+  - [Python Class / Packages Location](#python-class--packages-location)
+- [Dependency Management](#dependency-management)
+  - [Generate `requirements.txt`](#generate-requirementstxt)
+  - [Install from `requirements.txt`](#install-from-requirementstxt)
+- [Clean Code Conventions (Pythonic Style Guide)](#clean-code-conventions-pythonic-style-guide)
+  - [Naming](#naming)
+  - [File Names](#file-names)
+  - [Class Names](#class-names)
+  - [Method Names](#method-names)
+  - [Variable Names](#variable-names)
+  - [Visibility](#visibility)
+- [Smart Property Design (No Getter/Setter usage)](#smart-property-design-no-gettersetter-usage)
+- [Dunder Methods](#dunder-methods)
+- [Examples](#examples)
+  - [Creating a Child Class](#creating-a-child-class)
+  - [Using `super()` to Access the Parent Implementation](#using-super-to-access-the-parent-implementation)
+- [Importing and instantiating Classes](#importing-and-instantiating-classes)
+- [Execution Entry](#execution-entry)
+- [Essential Built-In Functions](#essential-built-in-functions)
+  - [File Handling with Auto-Close](#file-handling-with-auto-close)
+  - [Random Numbers](#random-numbers)
+  - [Rounding Numbers](#rounding-numbers)
+  - [Sleep / Timing](#sleep--timing)
+  - [Efficient String Building](#efficient-string-building)
+  - [Flexible Function Parameters](#flexible-function-parameters)
+    - [`*args` Positional Argument Collection](#args-positional-argument-collection)
+    - [`**kwargs` Named Arguments (Dictionary)](#kwargs-named-arguments-dictionary)
+  - [Lambda Functions](#lambda-functions)
+- [Working with Lists](#working-with-lists)
+  - [List Comprehension](#list-comprehension)
+  - [List Window](#list-window)
+  - [`map()`](#map)
+  - [`filter()`](#filter)
+- [For-Loops, Range, Enumerate and Zip](#for-loops-range-enumerate-and-zip)
+  - [Repetition](#repetition)
+  - [Iterate Through a List](#iterate-through-a-list)
+  - [Check Whole List for Condition](#check-whole-list-for-condition)
+  - [Index + Value: `enumerate()`](#index--value-enumerate)
+  - [Parallel Iteration: `zip()`](#parallel-iteration-zip)
+- [Exception Handling](#exception-handling)
+- [`__repr__()` Debugging Output](#repr-debugging-output)
+- [PyTrees](#pytrees)
+  - [What Are PyTrees?](#what-are-pytrees)
+  - [Key Concepts and Conventions](#key-concepts-and-conventions)
+  - [General organization](#general-organization)
+  - [Condition Nodes & Read/Write Clients](#condition-nodes-and-readwrite-clients)
+  - [Action Nodes](#action-nodes)
+  - [Factory Setup](#factory-setup)
+  - [Tree Execution example](#tree-execution-example)
+- [Execution Logic of Behavior Trees](#execution-logic-of-behavior-trees)
+  - [Root as the Primary Branching Point](#root-as-the-primary-branching-point)
+  - [Example: Combat Mode as a Sequence](#example-combat-mode-as-a-sequence)
+  - [What if Multiple States Are True Simultaneously?](#what-if-multiple-states-are-true-simultaneously)
+
 ---
 
 ## Why Python?
@@ -256,7 +321,7 @@ also usefull: `" ".join([...])` for list-based strings
 
 Python offers two ways to pass an arbitrary number of arguments
 
-#### `*args` — Positional Argument Collection
+#### `*args` Positional Argument Collection
 
 To use when expecting multiple values of the same kind
 
@@ -268,7 +333,7 @@ def log_multiple(*messages):
 log_multiple("Hi", "I'm", "cool")
 ```
 
-#### `**kwargs` — Named Arguments (Dictionary)
+#### `**kwargs` Named Arguments (Dictionary)
 
 To use when expecting various **named** values
 => use **.items()** to read them
@@ -395,7 +460,7 @@ except ValueError as e:
 
 ---
 
-## `__repr__()` — Debugging Output
+## `__repr__()` Debugging Output
 
 When `print(obj)` yields a cryptic memory address e.g. **0x7f9a324e7ac0**, implement
 
@@ -718,17 +783,16 @@ root = py_trees.composites.Parallel(
 
 ---
 
-## Final Words
+# Final Words
 
 This post evolves as I evolve. I will continuously refine and expand it as I deepen my understanding. Feedback and suggestions are always welcome!
 
 ---
 
-## Change Log
+# Change Log
 
-**Last Updated: 2025.07.15**  
-- Added **clarification** on how to access blackboard clients as `Writers` when working with `py_trees`
-- Added **installation note**: `py_trees` must be installed via `pip`
-- Implemented a **condition check** for the loop labeled `"all"` to improve control flow logic
-- Documented the **creation of a list window** 
-- Added a **note on `update()` function naming** for custom `Condition` nodes, to clarify behavior within behavior trees
+|   Version | Date       | Changes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------: | :--------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **1.0.0** | 2025-07-15 | - Added **clarification** on how to access blackboard clients as `Writers` when working with `py_trees`<br>- Added **installation note**: `py_trees` must be installed via `pip`  <br>- Implemented a **condition check** for the loop labeled `"all"` to improve control flow logic  <br>- Documented the **creation of a list window** for debugging and visualization  <br>- Added a **note on `update()` function naming** for custom `Condition` nodes \|<br>- Added Table of Contents |
+
+
