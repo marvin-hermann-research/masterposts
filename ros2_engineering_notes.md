@@ -1,9 +1,10 @@
 # ROS2 Engineering Notes - My Knowledge Stack
+
 ---
 
 ROS is a system that enables the control, maintenance, and design of individual components of one or multiple robotic systems via so-called **nodes**, which can be distributed over multiple computers
 
-## Setting up ROS 2:
+## Setting up ROS 2
 
 Install system-wide: `ros-humble-desktop`  
 ROS 2 **must always** be sourced in the terminal before use:
@@ -148,7 +149,7 @@ This is required for the node to be accessible via `ros2 run` and discoverable b
 
 Manual starting or importing does not require registration
 
-### ROS nodes are launched using the following syntax:
+**ROS nodes are launched using the following syntax**
 
 ```bash
 ros2 run <package_name> <entry_point_name>
@@ -164,7 +165,7 @@ entry_points={
 },
 ```
 
-#### Example
+**Example**
 
 In `setup.py`:
 
@@ -202,7 +203,7 @@ def main(args=None):
 
 In ROS, nodes can have one or both roles depending on the use case
 
-### Publisher Node:
+### Publisher Node
 
 - The node sends data at regular intervals on a **topic**
 
@@ -212,7 +213,7 @@ Create a publisher inside the node's `__init__` method and import the topic mess
 self._publisher = self.create_publisher(TOPIC_MSG_TYPE, 'TOPIC_NAME', QUEUE_SIZE)
 ```
 
-### Subscriber Node:
+### Subscriber Node
 
 - The node listens continuously to one or more **topics** and reacts to events
 
@@ -222,7 +223,7 @@ Create a subscriber inside the node's `__init__` method and import the topic mes
 self._subscription = self.create_subscription(TOPIC_MSG_TYPE, 'TOPIC_NAME', self.callback_method, QUEUE_SIZE)
 ```
 
-#### Subscriber callback method:
+#### Subscriber callback method
 
 The received message is passed as the second parameter
 
@@ -233,7 +234,7 @@ def listener_callback(self, msg):
 
 **Whenever possible, nodes should adhere to the single-responsibility principle.**
 
-### QUEUE_SIZE:
+### QUEUE_SIZE
 
 Relates to ROS's QoS (Quality of Service). It defines how many messages are buffered on the topic to handle possible packet loss
 
@@ -254,7 +255,7 @@ Each node can subscribe to any topic stream published within the ROS network.
 **IMPORTANT:** Normally, there should only be **ONE** publisher per topic, unless explicit redundancy is required
 If multiple publishers share a topic, signals **MUST** be identical
 
-### Listing Topics:
+### Listing Topics
 
 - List active topics
 
@@ -303,7 +304,7 @@ Action nodes consist of three components:
 2. **The action node itself**
 3. **The action topic**
 
-#### Action Types:
+#### Action Types
 
 Python classes generated from `.action` files. Predefined ones include:
 
@@ -312,7 +313,7 @@ Python classes generated from `.action` files. Predefined ones include:
 - `NavigateToPose` (Nav2)
 - `Dock`, `Undock` etc.
 
-##### Structure of a `.action` file:
+##### Structure of a `.action` file
 
 `WalkPattern.action`
 ```plain
@@ -331,7 +332,7 @@ int32 percent_complete
 string current_step_description
 ```
 
-##### Using the action in code:
+##### Using the action in code
 
 ```python
 from custom_interfaces.action import WalkPattern
@@ -349,7 +350,7 @@ result.success = True
 result.message = "Pattern completed"
 ```
 
-#### Action Node structure:
+#### Action Node structure
 
 ```python
 import rclpy
@@ -381,7 +382,7 @@ class PatternExecutor(Node):
         # goal_callback for accepting/rejecting goals
         # cancel_callback to handle cancel requests
 ```
-#### Action Topics:
+#### Action Topics
 
 Created when the action server is instantiated. Includes 4 subtopics:
 
@@ -395,7 +396,7 @@ Created when the action server is instantiated. Includes 4 subtopics:
 
 => There is no need for manual topic subscription; communication is handled through `ActionClient` and `ActionServer` interfaces
 
-#### Using Action Nodes:
+#### Using Action Nodes
 
 Conventionally, a regular node creates a **Goal** and sends it to the action node via the **ActionClient** using `send_goal_async()`, waiting for the response.
 
@@ -538,7 +539,7 @@ patterns:
 
 The main YAML is loaded by a node, and specific pattern YAMLs are loaded on demand.
 
-### YAML structure example:
+### YAML structure example
 
 `walk_forward.yaml`:
 
@@ -559,7 +560,7 @@ walk_forward:
       knee: 60
 ```
 
-### Using YAML:
+### Using YAML
 
 Import `yaml`, load in the action node’s `__init__` and convert to dictionary. In the callback, retrieve pattern name from goal, check existence, convert pattern with timestamps to a list, and execute sequentially or in parallel.
 
@@ -608,7 +609,43 @@ def execute_joints(self, joints_dict):
     pass
 ```
 
-# Implementing Py_trees Nodes in Ros
+## Implementing Py_trees Nodes in Ros
+
+In robotic systems that rely on both Behavior Trees and ROS 2, it is essential to utilize the **py_trees_ros2** extension in addition to the base **py_trees library**
+This extension ensures proper synchronization between the behavior tree's ticking mechanism and the ROS 2 communication layer, such as topic updates and callbacks
+## Core Integration Principles
+
+While **Condition Nodes** and **Action Nodes** continue to follow the conventional `py_trees.Behaviour` interface, the *architecture-level components*, such as the behavior tree factory and the ROS 2 execution entry point, are adapted to integrate with `py_trees_ros2`
+
+## Py_trees and ROS2 Workflow
+
+```bash
+├── [1] py_trees_condition_node           # py_trees.Behaviour
+│     ├── Evaluates internal state via writer interface
+│     └── Returns status (SUCCESS, FAILURE, RUNNING)
+│
+├── [2] py_trees_action_node              # py_trees.Behaviour
+│     ├── Receives instantiated ROS 2 publisher node
+│     ├── Publishes messages the recieved node
+│     └── Returns status (RUNNING → SUCCESS)
+│
+├── [3] ros2_publisher_node         # rclpy.Node
+│     ├── Instantiated during ROS 2 system initialization
+│     └── Passed into py_trees nodes to decouple logic
+│
+├── [4] ros2_listener_node          # rclpy.Node
+│     ├── Subscribes to sensor topics
+│     └── Evaluates data and updates shared state
+│
+└── [5] ros2_action_client          # rclpy.Node
+      ├── Sends e.g. MoveBaseGoal to action servers
+      └── Processes asynchronous results from server
+
+```
+
+## Condition Node Setup
+
+>Condition nodes are implemented using standard `py_trees` behavior classes and interact with a blackboard write interface
 
 A ROS-based sensor publisher node may directly implement a blackboard write interface **only if** its local sensor data is sufficient to determine the corresponding condition in the behavior tree.
 
@@ -670,17 +707,57 @@ class CanWalkEvaluator(Node):
 
     def _battery_listener_callback(self, data: BatteryState):
         return
-
 ```
 
-## Final Words
+## Action Node Setup 
+
+> Action nodes remain subclasses of `py_trees.Behaviour`, but rely on external ROS 2 publisher nodes. These publishers are passed as parameters and invoked during execution.
+
+This design **avoids redundant instantiations** of publisher interfaces and ensures that publishing responsibilities are testable, modular, and reusable outside the behavior tree context.
+
+```python
+import py_trees
+
+class MoveForwardAction(py_trees.behaviour.Behaviour):
+    def __init__(self, publisher_node):
+        super().__init__(name="MoveForwardAction")
+        self.publisher_node = publisher_node
+        self.sent = False
+
+    def update(self):
+        if not self.sent:
+            self.publisher_node.send_forward_command()
+            self.sent = True
+            return py_trees.common.Status.RUNNING
+        return py_trees.common.Status.SUCCESS
+```
+
+```python
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+
+class MoveForwardPublisher(Node):
+    def __init__(self):
+        super().__init__('move_forward_publisher')
+        self._publisher = self.create_publisher(String, '/movement_command', 10)
+
+    def send_forward_command(self):
+        msg = String()
+        msg.data = "forward"
+        self._publisher.publish(msg)
+```
+
+# Final Words
 
 This post evolves as I evolve. I will continuously refine and expand it as I deepen my understanding. Feedback and suggestions are always welcome!
 
 ---
 
-## Change Log
+#  Change Log
 
-**Last Updated: 25.07.15**  
-- Added chapter on **implementing py_trees in ros2**
-  
+| Version | Date       | Changes                                                                                                                                                              |
+| ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.2   | 2025-07-19 | - Added py_trees Action Node Setup section<br>- Added Core Integration Principles section<br>- Added Py_trees and ROS2 Workflow section<br> |
+| 1.0.1   | 2025-07-17 | Added py_trees Condition Node setup                                                                                                                                  |
+| 1.0.0   | 2025-07-15 | Added py_trees integration chapter                                                                                                                                   |
