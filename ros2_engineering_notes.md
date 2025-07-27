@@ -613,51 +613,106 @@ walk_forward:
 
 ### Using YAML
 
-Import `yaml`, load in the action node’s `__init__` and convert to dictionary. In the callback, retrieve pattern name from goal, check existence, convert pattern with timestamps to a list, and execute sequentially or in parallel.
+This implementation introduces a modular and scalable YAML-based motion execution system that decouples behavior triggering from trajectory execution. Motion patterns are externalized into YAML files and dynamically loaded and executed in response to behavior tree signals
+
+The functionality is split across four methods:
+
+1. **`__init__()`**  
+    At initialization, a pattern index file (`patterns.yaml`) is parsed into a dictionary `self._patterns`, mapping behavior names (e.g., `"walk_forward"`, `"idle"`) to the corresponding YAML file paths. A periodic timer (`~20 Hz`) is also created to enable real-time motion sequencing
+    
+2. **`_walk_forward_callback()`**  
+    This method is triggered when the `WalkForwardBehaviour` BT node becomes active. It delegates execution to `_load_and_start_pattern()` by passing the name `"walk_forward"`
+    
+3. **`_load_and_start_pattern()`**  
+    Loads the actual motion sequence for a given behavior from disk. The selected YAML file is parsed into a time-ordered list of steps, each specifying joint targets and timestamps. The sequence is stored in `self._current_pattern`, and the playback state (start time, step index) is initialized
+    
+4. **`_pattern_timer_callback()`**  
+    Runs every 50 ms and checks whether the next scheduled step in the motion pattern should be executed (based on its relative timestamp). If the current time has passed the step’s scheduled time, joint targets are sent to the actuators via `_execute_joints()`. This continues until the end of the pattern is reached
+    
+5. **`_execute_joints()`**  
+    Converts joint dictionaries from the YAML step into `Float32MultiArray` ROS messages, and publishes them to the left and right leg controller topics. Each joint command is mapped explicitly to `hip_left`, `knee_left`, `hip_right`, and `knee_right`
 
 ```python
 import yaml
 
-# in __init__:
-with open('patterns.yaml', 'r') as file:
-    self.patterns = yaml.safe_load(file)
+def __init__(self):
+    super().__init__("movement_controller")
+        
+    # Load the pattern index which maps behavior names to motion YAML files
+    with open("patterns.yaml", "r") as file:
+        self._patterns = yaml.safe_load(file)
 
-# example: self.patterns is now a dict with keys "walk_forward" and others
+    # Motion state
+    self._current_pattern = None                # Currently loaded motion sequence
+    self._pattern_start_time = None             # Timestamp when execution started
+    self._pattern_step_index = 0                # Index of current step being executed
 
-async def execute_callback(self, goal_handle):
-    self.start_time = time.time()
-    self.goal_handle = goal_handle
-    self.steps = self.patterns[goal_handle.request.pattern_name]
-    self.current_step_idx = 0
+    # Periodic execution of motion steps (~20 Hz)
+    self._timer = self.create_timer(0.05, self._pattern_timer_callback)
 
-    # check every 0.05s if next instruction should be executed
-    self.timer = self.create_timer(0.05, self.timer_callback)
 
-    # wait until all steps are executed
-    while self.current_step_idx < len(self.steps):
-        await asyncio.sleep(0.01)  # small pause for loop
+def _walk_forward_callback(self, instruction):
+    """
+    Triggered by WalkForwardBehaviour BT node.
+    Starts execution of the 'walk_forward' pattern.
+    """
+    self._load_and_start_pattern("walk_forward")
 
-    self.timer.cancel()
 
-    self.goal_handle.succeed()
-    result = WalkPattern.Result()
-    result.success = True
-    result.message = "Pattern finished"
-    return result
+def _load_and_start_pattern(self, pattern_name):
+	#Load and prepare execution of a time-stamped motion pattern.
+    path = self._patterns.get(pattern_name)
+    if path is None:
+        self.get_logger().error(f"Pattern '{pattern_name}' not found in index.")
+        return
 
-def timer_callback(self):
-    elapsed = time.time() - self.start_time
+    with open(path, "r") as f:
+        self._current_pattern = yaml.safe_load(f)[pattern_name]
 
-    while self.current_step_idx < len(self.steps) and self.steps[self.current_step_idx]['time'] <= elapsed:
-        step = self.steps[self.current_step_idx]
-        # set joint positions here
-        self.execute_joints(step['joints'])
+    self._pattern_start_time = time.time()
+    self._pattern_step_index = 0
 
-        self.current_step_idx += 1
 
-def execute_joints(self, joints_dict):
-    # Code to send joint angles to hardware
-    pass
+def _pattern_timer_callback(self):
+    """
+    Periodic callback that checks and executes due pattern steps.
+
+    Each step is executed when its timestamp has elapsed.
+    When all steps are completed, the pattern is cleared.
+    """
+    if self._current_pattern is None or self._pattern_start_time is None:
+        return
+
+    elapsed = time.time() - self._pattern_start_time
+
+    while (self._pattern_step_index < len(self._current_pattern) and
+           self._current_pattern[self._pattern_step_index]["time"] <= elapsed):
+        
+        step = self._current_pattern[self._pattern_step_index]
+        self._execute_joints(step["joints"])
+        self._pattern_step_index += 1
+
+    if self._pattern_step_index >= len(self._current_pattern):
+        self._current_pattern = None
+        self.get_logger().info("Pattern execution completed.")
+
+
+def _execute_joints(self, joints):
+	#Publish joint angle commands to both legs usinig a publisher.
+    left_msg = Float32MultiArray()
+    right_msg = Float32MultiArray()
+
+    left_msg.data = [
+        float(joints.get("hip_left", 0.0)),
+        float(joints.get("knee_left", 0.0)),
+    ]
+    right_msg.data = [
+        float(joints.get("hip_right", 0.0)),
+        float(joints.get("knee_right", 0.0)),
+    ]
+
+    self._left_leg_publisher.publish(left_msg)
+    self._right_leg_publisher.publish(right_msg)
 ```
 
 ## Implementing Py_trees Nodes in Ros
@@ -1002,8 +1057,9 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.1   | 2025-07-27 | - Updated Using YAML Section with new workflow                                                                                                                       |
 | 1.1.0   | 2025-07-21 | - Added Application Class Based Initialization of ROS2 Systems section<br>- Added Entry Point section                                                                |
 | 1.0.3   | 2025-07-20 | - Added Tree Factory Setup in ROS2 section                                                                                                                           |
 | 1.0.2   | 2025-07-19 | - Added py_trees Action Node Setup section<br>- Added Core Integration Principles section<br>- Added Py_trees and ROS2 Workflow section<br>- Added Table of Contents |
-| 1.0.1   | 2025-07-17 | Added py_trees Condition Node setup                                                                                                                                  |
-| 1.0.0   | 2025-07-15 | Added py_trees integration chapter                                                                                                                                   |
+| 1.0.1   | 2025-07-17 | - Added py_trees Condition Node setup                                                                                                                                |
+| 1.0.0   | 2025-07-15 | - Added py_trees integration chapter                                                                                                                                 |
