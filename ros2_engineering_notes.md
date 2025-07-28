@@ -48,6 +48,10 @@
     - [Wrapping the Behavior Tree in a ROS 2-Compatible Structure](#wrapping-the-behavior-tree-in-a-ros-2-compatible-structure)
     - [Registering Nodes with the ROS 2 Executor](#registering-nodes-with-the-ros-2-executor)
 - [Entry Point](#entry-point)
+- [Setting Conditions through Console via ROS2 Services](#setting-conditions-through-console-via-ros-2-services)
+	- [ROS2 Service Setup](#ros-2-service-setup)
+	- [Runtime Usage from Console](#runtime-usage-from-console)
+	- [Required Package Configuration](#required-package-configuration)
 - [Final Words](#final-words)
 - [Change Log](#change-log)
 
@@ -322,19 +326,19 @@ ros2 topic echo /topic_name
 
 ## ROS 2 Topic Message Types (Best-of List)
 
-|Type|Import|Description|
-|---|---|---|
-|`String`|`from std_msgs.msg import String`|Simple text|
-|`Bool`|`from std_msgs.msg import Bool`|True/False (e.g., "Tipped?")|
-|`Int32`, `Int64`, `Float32`, `Float64`|`from std_msgs.msg import Float32` etc.|Simple numeric values|
-|`Float32MultiArray`|`from std_msgs.msg import Float32MultiArray`|Multiple floats as list (e.g., 3 laser sensors, IMU)|
-|`LaserScan`|`from sensor_msgs.msg import LaserScan`|Comprehensive laser scan data including angles, ranges, intensities, range limits, timing info|
-|`Imu`|`from sensor_msgs.msg import Imu`|Inertial measurement data: orientation (quaternion), angular velocity, linear acceleration, covariance matrices|
-|`BatteryState`|`from sensor_msgs.msg import BatteryState`|Battery status: voltage, current, charge, capacity, percentage, power supply status|
-|`Twist`|`from geometry_msgs.msg import Twist`|Motion info: linear (x,y,z) and angular (roll, pitch, yaw) velocity|
-|`Pose`|`from geometry_msgs.msg import Pose`|Position and orientation of an object in space|
-|`PoseStamped`|`from geometry_msgs.msg import PoseStamped`|Pose with timestamp and coordinate frame metadata|
-|`JointState`|`from sensor_msgs.msg import JointState`|Robot joint states: names, positions, velocities, effort|
+| Type                                   | Import                                       | Description                                                                                                     |
+| -------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `String`                               | `from std_msgs.msg import String`            | Simple text                                                                                                     |
+| `Bool`                                 | `from std_msgs.msg import Bool`              | True/False (e.g., "Tipped?")                                                                                    |
+| `Int32`, `Int64`, `Float32`, `Float64` | `from std_msgs.msg import Float32` etc.      | Simple numeric values                                                                                           |
+| `Float32MultiArray`                    | `from std_msgs.msg import Float32MultiArray` | Multiple floats as list (e.g., 3 laser sensors, IMU)                                                            |
+| `LaserScan`                            | `from sensor_msgs.msg import LaserScan`      | Comprehensive laser scan data including angles, ranges, intensities, range limits, timing info                  |
+| `Imu`                                  | `from sensor_msgs.msg import Imu`            | Inertial measurement data: orientation (quaternion), angular velocity, linear acceleration, covariance matrices |
+| `BatteryState`                         | `from sensor_msgs.msg import BatteryState`   | Battery status: voltage, current, charge, capacity, percentage, power supply status                             |
+| `Twist`                                | `from geometry_msgs.msg import Twist`        | Motion info: linear (x,y,z) and angular (roll, pitch, yaw) velocity                                             |
+| `Pose`                                 | `from geometry_msgs.msg import Pose`         | Position and orientation of an object in space                                                                  |
+| `PoseStamped`                          | `from geometry_msgs.msg import PoseStamped`  | Pose with timestamp and coordinate frame metadata                                                               |
+| `JointState`                           | `from sensor_msgs.msg import JointState`     | Robot joint states: names, positions, velocities, effort                                                        |
 
 ## Action Nodes
 
@@ -909,13 +913,14 @@ class TreeFactory:
 
     def create_locomotion_tree(self):
         # Create root composite
-        root = Selector(name="Locomotion")
+        root = Selector(
+	        name="Locomotion Root",
+			memory=True)
 
         # Instantiate leaf nodes
         is_grounded = IsGroundedCondition()  # Static condition, no ROS2 needed
         move_forward = MoveForwardAction(
-            publisher=self._ros_nodes["move_forward_publisher"]
-        )
+        self._ros_nodes["move_forward_publisher"])
 
         # Compose the subtree
         root.add_children([is_grounded, move_forward])
@@ -1047,6 +1052,139 @@ if __name__ == "__main__":
     main()
 ```
 
+## Setting Conditions through Console via ROS2 Services
+
+In ROS2, a **Service** represents a synchronous communication interface that can be called at any time, including from the console. Thanks to ROS2's multithreaded executor, such services are particularly suitable for **using external commands or triggers**, e.g. setting behavior tree conditions dynamically
+
+It is considered **best practice** to implement a **dedicated service node** that exposes a **single service interface** for modifying internal behavior parameters such as blackboard conditions.
+
+### ROS2 Service Setup
+
+A ROS2 Service mechanism consists of the following components:
+
+1. **`SetCondition.srv`**  
+    → *Defines the structure of the service request and response messages.*
+
+2. **`ConditionServiceNode.py`**  
+    → *Implements the server logic which modifies the behavior tree's blackboard on service request.*
+
+These elements must be **explicitly registered** within the ROS2 package configuration:
+
+- `package.xml`
+- `CMakeLists.txt`
+- `setup.py`
+
+**SetCondition.srv**
+
+**Location**: In the root of the ROS package, not within the Python submodule.
+
+	-> `your_ros_pkg/srv/SetCondition.srv`
+
+```srv
+string key     # Name of the condition, e.g. "must_walk"
+bool value     # Desired boolean value
+---
+bool success   # Whether the operation was successful
+```
+
+This service definition enables clients to dynamically set arbitrary keys on the PyTrees blackboard
+
+**ConditionServiceNode.py**
+
+```python
+import rclpy
+from rclpy.node import Node
+from your_ros_pkg.srv import SetCondition  # Import the .srv definition
+
+import py_trees
+
+
+class ConditionServiceNode(Node):
+    """
+    A ROS2 service node that enables runtime modification of behavior tree conditions.
+
+    It exposes a service `/set_condition`, which allows setting boolean flags 
+    on the blackboard. These flags can be read by behavior tree condition nodes 
+    to dynamically adapt robot behavior.
+    """
+
+    def __init__(self):
+        super().__init__("condition_service_node")
+
+        # Initialize blackboard write access
+        self._blackboard = py_trees.blackboard.Client(name="ConditionServiceNode")
+        self._blackboard.register_key("must_walk", access=py_trees.common.Access.WRITE)
+        # Additional keys can be registered here as needed
+
+        # Create ROS2 service
+        self._srv = self.create_service(
+            SetCondition,            # Auto-generated class from SetCondition.srv
+            "set_condition",         # Service name
+            self.set_condition_callback
+        )
+
+    def set_condition_callback(self, request, response):
+        """
+        Callback triggered when a client calls the `/set_condition` service.
+        Sets a blackboard key to a specified boolean value.
+
+        Args:
+            request (SetCondition.Request): Contains 'key' (blackboard key name) and 'value' (boolean).
+            response (SetCondition.Response): Will contain 'success' status after attempting the update.
+
+        Returns:
+            SetCondition.Response: Response indicating whether the operation was successful.
+        """
+        try:
+            setattr(self._blackboard, request.key, request.value)
+            response.success = True
+        except Exception as e:
+            self.get_logger().error(f"Failed to set condition: {e}")
+            response.success = False
+
+        return response
+```
+
+### Runtime Usage from Console
+
+```bash
+ros2 service call /set_condition your_ros_pkg/srv/SetCondition "{key: 'must_walk', value: true}"
+```
+
+This call sets the "must_walk" key on the PyTrees blackboard. Any condition node relying on this key (such as `mustWalk`) will react accordingly during the next behavior tree tick
+
+### Required Package Configuration
+
+**CMakeLists.txt**
+
+Created in the same folder as package.xml
+
+```cmake
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/SetCondition.srv"
+)
+```
+
+**package.xml**
+
+```xml
+<build_depend>rosidl_default_generators</build_depend>
+<exec_depend>rosidl_default_runtime</exec_depend>
+```
+
+**setup.py**
+
+```python
+data_files=[
+    ('share/ament_index/resource_index/packages',
+     ['resource/' + package_name]),
+    ('share/' + package_name, ['package.xml']),
+    ('share/' + package_name + '/srv', ['srv/SetCondition.srv']),
+],
+```
+
 # Final Words
 
 This post evolves as I evolve. I will continuously refine and expand it as I deepen my understanding. Feedback and suggestions are always welcome!
@@ -1057,6 +1195,7 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.2   | 2025-07-28 | - Added Setting Conditions through Console via ROS2 Services section                                                                                                 |
 | 1.1.1   | 2025-07-27 | - Updated Using YAML Section with new workflow                                                                                                                       |
 | 1.1.0   | 2025-07-21 | - Added Application Class Based Initialization of ROS2 Systems section<br>- Added Entry Point section                                                                |
 | 1.0.3   | 2025-07-20 | - Added Tree Factory Setup in ROS2 section                                                                                                                           |
