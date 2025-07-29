@@ -42,16 +42,24 @@
 - [Action Node Setup](#action-node-setup)
 - [Tree Factory Setup in ROS2](#tree-factory-setup-in-ros2)
   - [Example: Locomotion Subtree](#example-locomotion-subtree)
-- [Application Class Based Initialization of ROS2 Systems](#application-class-based-initialization-of-ros2-systems)
-  - [Application Class Structure and Responsabilities](#application-class-structure-and-responsabilities)
-  - [Further Explaination](#further-explaination)
+- [Application Class-Based Initialization of ROS 2 Systems](#application-class-based-initialization-of-ros-2-systems)
+  - [Application Class Structure and Responsibilities](#application-class-structure-and-responsibilities)
+  - [Detailed Explanation](#detailed-explanation)
     - [Wrapping the Behavior Tree in a ROS 2-Compatible Structure](#wrapping-the-behavior-tree-in-a-ros-2-compatible-structure)
     - [Registering Nodes with the ROS 2 Executor](#registering-nodes-with-the-ros-2-executor)
 - [Entry Point](#entry-point)
-- [Setting Conditions through Console via ROS2 Services](#setting-conditions-through-console-via-ros-2-services)
-	- [ROS2 Service Setup](#ros-2-service-setup)
-	- [Runtime Usage from Console](#runtime-usage-from-console)
-	- [Required Package Configuration](#required-package-configuration)
+- [Usage of `ament_cmake`](#usage-of-ament_cmake)
+  - [Migrating from `ament_python` to `ament_cmake`](#migrating-from-ament_python-to-ament_cmake)
+  - [Example Conversion](#example-conversion)
+    - [`setup.py` (Before Migration)](#setuppy-before-migration)
+    - [Executable Rights for Python Scripts](#executable-rights-for-python-scripts)
+      - [Option 1 – With Git](#option-1--with-git)
+      - [Option 2 – Without Git](#option-2--without-git)
+    - [Final `CMakeLists.txt` (After Migration)](#final-cmakeliststxt-after-migration)
+- [Setting Conditions via Console Using ROS 2 Services](#setting-conditions-via-console-using-ros-2-services)
+  - [ROS 2 Service Setup](#ros-2-service-setup)
+  - [Runtime Usage from Console](#runtime-usage-from-console)
+  - [Required Package Configuration](#required-package-configuration)
 - [Final Words](#final-words)
 - [Change Log](#change-log)
 
@@ -127,12 +135,14 @@ Inside the workspace run:
 ros2 pkg create --build-type ament_python PACKAGENAME
 ```
 
-You can create either Python or C++ packages using:
+You can create either Python packages or C++ *and* Python packages using:
 
 - `ament_python`
 - `ament_cmake`
 
-Each package contains **setup.py** and **package.xml** files
+*for now I will only focus on ament_python. A cmake section can be found later on*
+
+An ament_python package contains **setup.py** and **package.xml** files
 
 ### setup.py
 
@@ -1052,11 +1062,181 @@ if __name__ == "__main__":
     main()
 ```
 
+## Usage of  ament_cmake
+
+As mentioned before, in ROS 2, packages can be built using either `ament_python` or `ament_cmake` as their build system
+
+- **`ament_python`** is used for building _pure_ Python packages. It is suitable when the project consists only of Python scripts and does **not** define any custom ROS interfaces such as `.msg` or `.srv` files. It is limited in scope and typically used for lightweight tools, helper nodes, or prototypes
+
+- **`ament_cmake`**, on the other hand, is the standard build system for ROS 2. It supports both **C++ and Python code**, and allows the generation and usage of custom message types, service definitions (`.srv`), and action definitions (`.action`). This makes it the **preferred choice for larger, more complex, and research-oriented robotics projects** that involve a wide variety of ROS features
+
+### Migrating a package from ament_python to ament_cmake
+
+Migrating an existing `ament_python` based package to `ament_cmake` is straightforward and can be done in a few simple steps:
+
+1. **Delete** or deactivate `setup.cfg`
+2. **Replace** `setup.py` with a `CMakeLists.txt` file that defines the Python installation and other build instructions
+3. **Edit** `package.xml`:
+	- Replace `<build_type>ament_python</build_type>` with `<build_type>ament_cmake</build_type>`
+4. Optionally, add support for `.srv`, `.msg`, or `.action` files using `rosidl_generate_interfaces()` in `CMakeLists.txt`
+
+No changes to the Python source code are required. Imports such as `py_trees`, `py_trees_ros`, and internal module structure remain untouched
+
+### Example conversion 
+
+#### `setup.py` (before migration)
+
+```python
+from setuptools import find_packages, setup
+
+package_name = 'bipedal_robot_pkg'
+
+setup(
+    name=package_name,
+    version='0.0.0',
+    packages=find_packages(exclude=['test']),
+
+    # Install metadata and ROS-specific resources
+    data_files=[
+        ('share/ament_index/resource_index/packages',
+         ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+    ],
+
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='marvin',
+    maintainer_email='marvin@todo.todo',
+    description='TODO: Package description',
+    license='TODO: License declaration',
+    tests_require=['pytest'],
+
+    # Define executable Python nodes as console scripts
+    entry_points={
+        'console_scripts': [
+            'imu_sensor = bipedal_robot_pkg.imu_sensor_node:main',
+            'laser_sensor = bipedal_robot_pkg.laser_sensor_node:main',
+            'battery_monitor = bipedal_robot_pkg.battery_monitor_node:main',
+        ],
+    },
+)
+```
+
+**Note:** Every console script must also include the following _shebang_ at the very top of the Python file:
+
+```python
+#!/usr/bin/env python3
+```
+
+**Ensuring your Python console scripts are executable**
+
+To ensure that Python based console scripts are executable after installation, the proper file permissions must be set **manually**
+
+> This step is **mandatory** otherwise `ros2 run your_package your_script.py` may fail due to missing executable rights
+
+#### Option 1 – If Git is used
+
+To set and preserve executable rights in Git (so others don't need to do it manually):
+
+-  Open a terminal and navigate to the workspace source:
+
+```bash
+cd ~/ros2_ws/src/bipedal_robot_pkg
+```
+
+-  Run:
+
+```bash
+git update-index --chmod=+x bipedal_robot_pkg/ros_nodes/sensors/*.py
+```
+
+This marks the scripts as executable and Git will track this permission. Everyone who clones the repo will have the correct flags automatically after `colcon build`
+
+#### Option 2 – If no Git is used
+
+You can set the permissions manually (local only):
+
+- Open a terminal and navigate to the workspace source:
+
+```bash
+cd ~/ros2_ws/src/bipedal_robot_pkg
+```
+
+- Make your sensor scripts executable:
+
+```bash
+chmod +x bipedal_robot_pkg/ros_nodes/sensors/*.py
+```
+
+This only applies **on the own machine**, so others would have to do the same
+
+The line `USE_SOURCE_PERMISSIONS` in the `CMakeLists.txt` ensures these flags are copied **into the install directory**, but **it does not set them**. That's why this setup is needed once at the source level.
+
+### Final `CMakeLists.txt` (after migration)
+
+```CMake
+cmake_minimum_required(VERSION 3.8)
+project(bipedal_robot_pkg)
+
+# Find required ROS and Python dependencies
+find_package(ament_cmake REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(py_trees REQUIRED)
+find_package(py_trees_ros REQUIRED)
+
+# Install Python package directory
+install(
+  DIRECTORY bipedal_robot_pkg
+  DESTINATION lib/${PROJECT_NAME}
+  USE_SOURCE_PERMISSIONS
+)
+
+# Install launch files (if any)
+install(
+  DIRECTORY bipedal_robot_pkg/behaviour_tree/launch
+  DESTINATION share/${PROJECT_NAME}/launch
+)
+
+# Install resource file for ROS package index
+install(
+  FILES resource/${PROJECT_NAME}
+  DESTINATION share/ament_index/resource_index/packages
+)
+
+# Install package.xml (mandatory for ROS2)
+install(
+  FILES package.xml
+  DESTINATION share/${PROJECT_NAME}
+)
+
+# Install console scripts by installing Python package
+ament_python_install_package(${PROJECT_NAME})
+
+# Manually define console script executables
+# Note: each console script must include the shebang '#!/usr/bin/env python3'
+ament_python_install_modules()
+install(PROGRAMS
+  bipedal_robot_pkg/ros_nodes/sensors/imu_sensor_node.py
+  bipedal_robot_pkg/ros_nodes/sensors/laser_sensor_node.py
+  bipedal_robot_pkg/ros_nodes/sensors/battery_monitor_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Register Python executables with ROS environment
+ament_environment_hooks(
+  "${ament_cmake_package_templates_ENVIRONMENT_HOOK_LIBRARY}"
+)
+
+ament_package()
+```
+
 ## Setting Conditions through Console via ROS2 Services
 
 In ROS2, a **Service** represents a synchronous communication interface that can be called at any time, including from the console. Thanks to ROS2's multithreaded executor, such services are particularly suitable for **using external commands or triggers**, e.g. setting behavior tree conditions dynamically
 
 It is considered **best practice** to implement a **dedicated service node** that exposes a **single service interface** for modifying internal behavior parameters such as blackboard conditions.
+
+**Services rely on using ament_cmake**
 
 ### ROS2 Service Setup
 
@@ -1072,7 +1252,6 @@ These elements must be **explicitly registered** within the ROS2 package configu
 
 - `package.xml`
 - `CMakeLists.txt`
-- `setup.py`
 
 **SetCondition.srv**
 
@@ -1157,8 +1336,6 @@ This call sets the "must_walk" key on the PyTrees blackboard. Any condition node
 
 **CMakeLists.txt**
 
-Created in the same folder as package.xml
-
 ```cmake
 find_package(rosidl_default_generators REQUIRED)
 
@@ -1174,17 +1351,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 <exec_depend>rosidl_default_runtime</exec_depend>
 ```
 
-**setup.py**
-
-```python
-data_files=[
-    ('share/ament_index/resource_index/packages',
-     ['resource/' + package_name]),
-    ('share/' + package_name, ['package.xml']),
-    ('share/' + package_name + '/srv', ['srv/SetCondition.srv']),
-],
-```
-
 # Final Words
 
 This post evolves as I evolve. I will continuously refine and expand it as I deepen my understanding. Feedback and suggestions are always welcome!
@@ -1195,6 +1361,7 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.3   | 2025-07-29 | - Corrected error in Creating a New Package section<br>- Added Usage of  ament_cmake section                                                                         |
 | 1.1.2   | 2025-07-28 | - Added Setting Conditions through Console via ROS2 Services section                                                                                                 |
 | 1.1.1   | 2025-07-27 | - Updated Using YAML Section with new workflow                                                                                                                       |
 | 1.1.0   | 2025-07-21 | - Added Application Class Based Initialization of ROS2 Systems section<br>- Added Entry Point section                                                                |
