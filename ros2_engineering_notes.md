@@ -39,6 +39,7 @@
 - [Core Integration Principles](#core-integration-principles)
 - [Py_trees and ROS2 Workflow](#py_trees-and-ros2-workflow)
 - [Condition Node Setup](#condition-node-setup)
+	- [Setting Conditions via Console](#setting-conditions-via-console)
 - [Action Node Setup](#action-node-setup)
 - [Tree Factory Setup in ROS2](#tree-factory-setup-in-ros2)
   - [Example: Locomotion Subtree](#example-locomotion-subtree)
@@ -850,6 +851,20 @@ class CanWalkEvaluator(Node):
         return
 ```
 
+### Setting Conditions via Console
+
+Publishing messages to a ROS2 topic via the console enables dynamic control of behavior tree conditions at runtime.  For this usecase an **Evaluator Class** can be used
+
+The **Evaluator Class** subscribes to *one* topic to update a single condition flag.
+
+For this use case, it is recommended to use the **`std_msgs/msg/Bool`** message type to represent binary conditions.
+
+**Example: Publishing a boolean condition via console:**
+
+```bash
+ros2 topic pub /must_walk_command std_msgs/msg/Bool "{data: true}"
+```
+
 ## Action Node Setup 
 
 > Action nodes remain subclasses of `py_trees.Behaviour`, but rely on external ROS 2 publisher nodes. These publishers are passed as parameters and invoked during execution.
@@ -1150,6 +1165,8 @@ cd ~/ros2_ws/src/bipedal_robot_pkg
 git update-index --chmod=+x bipedal_robot_pkg/ros_nodes/sensors/*.py
 ```
 
+*In this particular case the folder sensors contains all console scripts*
+
 This marks the scripts as executable and Git will track this permission. Everyone who clones the repo will have the correct flags automatically after `colcon build`
 
 #### Option 2 – If no Git is used
@@ -1361,6 +1378,7 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.4   | 2025-07-31 | Added Setting Conditions via Console section                                                                                                                         |
 | 1.1.3   | 2025-07-29 | - Corrected error in Creating a New Package section<br>- Added Usage of  ament_cmake section                                                                         |
 | 1.1.2   | 2025-07-28 | - Added Setting Conditions through Console via ROS2 Services section                                                                                                 |
 | 1.1.1   | 2025-07-27 | - Updated Using YAML Section with new workflow                                                                                                                       |
