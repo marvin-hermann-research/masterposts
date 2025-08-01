@@ -44,8 +44,9 @@
 - [Tree Factory Setup in ROS2](#tree-factory-setup-in-ros2)
   - [Example: Locomotion Subtree](#example-locomotion-subtree)
 - [Application Class-Based Initialization of ROS 2 Systems](#application-class-based-initialization-of-ros-2-systems)
-  - [Application Class Structure and Responsibilities](#application-class-structure-and-responsibilities)
-  - [Detailed Explanation](#detailed-explanation)
+	- [Installing py_trees_ros for ROS 2 ](#installing-py-trees-ros-for-ros-2)
+	- [Application Class Structure and Responsibilities](#application-class-structure-and-responsibilities)
+	- [Detailed Explanation](#detailed-explanation)
     - [Wrapping the Behavior Tree in a ROS 2-Compatible Structure](#wrapping-the-behavior-tree-in-a-ros-2-compatible-structure)
     - [Registering Nodes with the ROS 2 Executor](#registering-nodes-with-the-ros-2-executor)
 - [Entry Point](#entry-point)
@@ -956,9 +957,27 @@ class TreeFactory:
 
 It is a common convention in ROS2-based development to encapsulate the initialization of the entire system within a single dedicated **application class**
 
-While this architectural pattern is not inherently tied to the use of behavior trees or the `py_trees` framework, it provides a structured foundation that readily accommodates them.
+While this architectural pattern is not inherently tied to the use of behavior trees or the `py_trees` framework, it provides a structured foundation that readily accommodates them
 
-I introduce this concept at this stage because my primary use case focuses on the integration of `py_trees` within ROS2 systems, where the application class serves as a cohesive entry point for both robotic control logic and behavior orchestration.
+I introduce this concept at this stage because my primary use case focuses on the integration of `py_trees` within ROS2 systems, where the application class serves as a cohesive entry point for both robotic control logic and behavior orchestration
+
+### Installing py_trees_ros for ROS 2
+
+The `py_trees_ros` package provides ROS 2–specific extensions and behavior tree utilities for the `py_trees` framework. Despite some tutorials referring to a module named `py_trees_ros2`, **no such package exists**, all ROS 2 functionality is included within `py_trees_ros` version 2.x and above
+
+To install it and all necessary components, run:
+
+```bash
+sudo apt update
+sudo apt install \
+  ros-humble-py-trees \
+  ros-humble-py-trees-ros \
+  ros-humble-py-trees-ros-interfaces \
+  ros-humble-py-trees-ros-tutorials \
+  ros-humble-py-trees-ros-viewer
+```
+
+Then build the workspace and source it. Now py_trees_ros ist importable
 
 ### Application Class Structure and Responsabilities
 
@@ -987,24 +1006,24 @@ class BehaviorTreeApp:
 
         # === 2. Instantiate ROS 2 nodes ===
         move_publisher_node = MovePublisherNode()
-        self.nodes = {
+        self._nodes = {
             "move_publisher": move_publisher_node
         }
 
         # === 3. Construct the behavior tree via factory ===
-        self.factory = TreeFactory(self.nodes)
-        root = self.factory.create_locomotion_tree()
+        self._factory = TreeFactory(self.nodes)
+        root = self._factory.create_locomotion_tree()
 
         # === 4. Initialize py_trees_ros2 wrapper ===
-        self.tree = py_trees_ros2.BehaviourTree(
+        self._tree = py_trees_ros2.BehaviourTree(
             root=root,
             node=self.nodes["move_publisher"],  # central or coordinating node
             name="LocomotionBT"
         )
-        self.tree.setup(timeout=15)
+        self._tree.setup(timeout=15)
 
         # === 5. Setup multi-threaded ROS 2 executor ===
-        self.executor = MultiThreadedExecutor()
+        self._executor = MultiThreadedExecutor()
         for node in self.nodes.values():
             self.executor.add_node(node)
 
@@ -1012,10 +1031,10 @@ class BehaviorTreeApp:
     def run(self):
         try:
             # Tick the behavior tree periodically
-            self.tree.tick_tock(period_ms=100)
+            self._tree.tick_tock(period_ms=100)
 
             # Spin the ROS 2 executor
-            self.executor.spin()
+            self._executor.spin()
         except KeyboardInterrupt:
             pass
         finally:
@@ -1378,6 +1397,7 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.5   | 2025-08-01 | Added Installing py_trees_ros for ROS 2 section                                                                                                                      |
 | 1.1.4   | 2025-07-31 | Added Setting Conditions via Console section                                                                                                                         |
 | 1.1.3   | 2025-07-29 | - Corrected error in Creating a New Package section<br>- Added Usage of  ament_cmake section                                                                         |
 | 1.1.2   | 2025-07-28 | - Added Setting Conditions through Console via ROS2 Services section                                                                                                 |
