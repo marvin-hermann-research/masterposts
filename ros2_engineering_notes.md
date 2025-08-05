@@ -733,20 +733,20 @@ def _execute_joints(self, joints):
 
 ## Implementing Py_trees Nodes in Ros
 
-In robotic systems that rely on both Behavior Trees and ROS 2, it is essential to utilize the **py_trees_ros2** extension in addition to the base **py_trees library**
+In robotic systems that rely on both Behavior Trees and ROS 2, it is essential to utilize the **py_trees_ros** extension in addition to the base **py_trees library**
 This extension ensures proper synchronization between the behavior tree's ticking mechanism and the ROS 2 communication layer, such as topic updates and callbacks
 ## Core Integration Principles
 
-While **Condition Nodes** and **Action Nodes** continue to follow the conventional `py_trees.Behaviour` interface, the *architecture-level components*, such as the behavior tree factory and the ROS 2 execution entry point, are adapted to integrate with `py_trees_ros2`
+While **Condition Nodes** and **Action Nodes** continue to follow the conventional `py_trees.Behaviour` interface, the *architecture-level components*, such as the behavior tree factory and the ROS 2 execution entry point, are adapted to integrate with `py_trees_ros`
 
 ## Py_trees and ROS2 Workflow
 
 ```bash
-├── [1] py_trees_condition_node           # py_trees.Behaviour
+├── [1] py_trees_condition_node     # py_trees.Behaviour
 │     ├── Evaluates internal state via writer interface
 │     └── Returns status (SUCCESS, FAILURE, RUNNING)
 │
-├── [2] py_trees_action_node              # py_trees.Behaviour
+├── [2] py_trees_action_node        # py_trees.Behaviour
 │     ├── Receives instantiated ROS 2 publisher node
 │     ├── Publishes messages the recieved node
 │     └── Returns status (RUNNING → SUCCESS)
@@ -986,7 +986,7 @@ The Application class provides seven different services
 1) **Initialize the ROS 2 runtime**
 2) **Instantiate all required ROS 2 nodes**
 3) **Construct the behavior tree via a factory class**
-4) **Initialize the behavior tree using `py_trees_ros2`**
+4) **Initialize the behavior tree using `py_trees_ros`**
 5) **Register all nodes with a multi-threaded ROS 2 executor**
 6) **Define the main system loop (including behavior tree ticking)**
 7) **Ensure graceful system shutdown**
@@ -994,7 +994,7 @@ The Application class provides seven different services
 ```python
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
-import py_trees_ros2
+from py_trees_ros.trees import BehaviourTree
 
 from my_ros_nodes import MovePublisherNode
 from tree_factory import TreeFactory
@@ -1014,11 +1014,10 @@ class BehaviorTreeApp:
         self._factory = TreeFactory(self.nodes)
         root = self._factory.create_locomotion_tree()
 
-        # === 4. Initialize py_trees_ros2 wrapper ===
-        self._tree = py_trees_ros2.BehaviourTree(
-            root=root,
-            node=self.nodes["move_publisher"],  # central or coordinating node
-            name="LocomotionBT"
+        # === 4. Initialize py_trees_ros wrapper ===
+        self._tree = BehaviourTree(
+            root,
+            False
         )
         self._tree.setup(timeout=15)
 
@@ -1052,17 +1051,18 @@ class BehaviorTreeApp:
 4) Wrapping the Behavior Tree in a ROS 2-Compatible Structure
 
 ```python
-self.tree = py_trees_ros2.BehaviourTree(...)
+from py_trees_ros.trees import BehaviourTree
+
+#...
+
+self.tree = BehaviourTree(rootNode, bool)
 ```
 
-This wraps a given behavior tree (specified via `root`) into a structure compatible with ROS 2
+The `BehaviourTree` class wraps a given py_trees behavior tree into a structure compatible with ROS 2.  
+Internally, it creates an `rclpy.Timer` and sets up periodic ticking through the `tick_tock(...)` method.  
+This method also internally calls `rclpy.spin(...)`, which enters the ROS event loop.
 
-To make the tree operational within the ROS 2 ecosystem, one of your ROS nodes must act as the _host_ node. This host node provides the ROS execution context (e.g., clock, timers, logging) and **must** be a ROS node
-
-Internally, `py_trees_ros2.BehaviourTree` sets up an `rclpy.Timer` and handles periodic ticking of the tree using `tick_tock(...)`
-This ensures the tree is updated (ticked) in sync with other ROS components
-
-The tree now behaves like any ROS node, integrated into the ROS event loop
+As a result, the tree becomes fully integrated into the ROS runtime and is ticked in sync with all other ROS events.
 
 5) Registering Nodes with the ROS 2 Executor
 
@@ -1080,21 +1080,38 @@ ROS 2 offers different types of executors:
 All registered nodes are added to the executor, which then handles all event-driven execution
 
 This means the `tick_tock(...)` based tree ticking is handled just like any other timer based ROS callback through the executor’s queue
-
 ## Entry Point
 
-A conventional Python entry point is used to initialize the `BehaviorTreeApp` and thereby launch the full ROS 2 system.
+To launch the complete system using `ros2 run`, a **standard Python `main()` function** must be defined **outside** the application class and properly registered in the `setup.py` file under `console_scripts`.
 
 ```python
-from app import BehaviorTreeApp
-
-def main():
+def main(args=None):
+    """
+    Main entry point for the BehaviorTreeApp.
+    Initializes the application and starts the main execution loop.
+    """
     app = BehaviorTreeApp()
     app.run()
-
-if __name__ == "__main__":
-    main()
 ```
+
+```python
+entry_points={
+    'console_scripts': [
+'robot_application = PATH:main',
+    ],
+}
+```
+
+## ROS2 Executor
+
+The executor is responsible for managing the callback queue, which includes all timers, subscriptions, and service callbacks registered by the nodes
+
+ROS 2 offers different types of executors:
+
+- **`SingleThreadedExecutor`**: processes callbacks sequentially, suitable for deterministic behavior
+- **`MultiThreadedExecutor`**: allows callbacks to be processed in parallel, enabling concurrency across nodes and their internal timers
+
+All registered nodes are added to the executor, which then handles all event-driven execution
 
 ## Usage of  ament_cmake
 
@@ -1397,6 +1414,7 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.6   | 2025-08-05 | - Updated Application Class Structure and Responsabilities section<br>- Updated Entry Point Section                                                                  |
 | 1.1.5   | 2025-08-01 | Added Installing py_trees_ros for ROS 2 section                                                                                                                      |
 | 1.1.4   | 2025-07-31 | Added Setting Conditions via Console section                                                                                                                         |
 | 1.1.3   | 2025-07-29 | - Corrected error in Creating a New Package section<br>- Added Usage of  ament_cmake section                                                                         |
