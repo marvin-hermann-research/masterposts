@@ -62,6 +62,9 @@
   - [ROS 2 Service Setup](#ros-2-service-setup)
   - [Runtime Usage from Console](#runtime-usage-from-console)
   - [Required Package Configuration](#required-package-configuration)
+-   [Logging in Ros2](#logging_in_ros_2)
+	- [Standard Console Logging](#standard_console_logging)
+	- [Logging of py_trees Nodes](#logging_of_py_trees_nodes)
 - [Final Words](#final-words)
 - [Change Log](#change-log)
 
@@ -983,7 +986,7 @@ Then build the workspace and source it. Now py_trees_ros ist importable
 
 The Application class provides seven different services
 
-1) **Initialize the ROS 2 runtime**
+1) **Initialize the ROS 2 runtime and Node**
 2) **Instantiate all required ROS 2 nodes**
 3) **Construct the behavior tree via a factory class**
 4) **Initialize the behavior tree using `py_trees_ros`**
@@ -993,16 +996,18 @@ The Application class provides seven different services
 
 ```python
 import rclpy
+from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from py_trees_ros.trees import BehaviourTree
 
 from my_ros_nodes import MovePublisherNode
 from tree_factory import TreeFactory
 
-class BehaviorTreeApp:
+class BehaviorTreeApp(Node):
     def __init__(self):
         # === 1. Initialize the ROS 2 runtime ===
-        rclpy.init()
+        rclpy.init() # Must be the first method to be called otherwise ros2 will crash
+        super().__init__("bipedal_robot_application")
 
         # === 2. Instantiate ROS 2 nodes ===
         move_publisher_node = MovePublisherNode()
@@ -1404,6 +1409,36 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 <exec_depend>rosidl_default_runtime</exec_depend>
 ```
 
+## Logging in ROS2
+
+### Standard Console logging
+
+For standard logging within ROS2 nodes, it is conventional to use the node’s internal logger, which can be accessed via `self.get_logger()`
+This method supports five severity levels:
+
+| Method                    | Severity Level | When to use                                                          |
+| ------------------------- | -------------- | -------------------------------------------------------------------- |
+| `get_logger().debug(msg)` | Debug          | For highly detailed internal information, mainly during development. |
+| `get_logger().info(msg)`  | Info           | For general runtime information (e.g., successful node startup).     |
+| `get_logger().warn(msg)`  | Warning        | For non-critical issues that may require attention.                  |
+| `get_logger().error(msg)` | Error          | For serious errors where the node is still running.                  |
+| `get_logger().fatal(msg)` | Fatal          | For critical failures – the system may need to shut down.            |
+### Logging of py_trees Nodes
+
+Although `py_trees` provides its own logging mechanism, **when used in combination with ROS2**, it is conventionally recommended to route all logging through the ROS2 logger. This ensures **centralized, consistent, and integrated log output** across the entire ROS2 system
+
+To achieve this, a ROS2 logger (usually the one from the main node) should be passed into the constructor of each behavior tree node that requires logging:
+
+```python
+class MyAction(py_trees.behaviour.Behaviour):
+    def __init__(self, name, ros_logger):
+        super().__init__(name)
+        self.ros_logger = ros_logger
+
+    def update(self):
+        self.ros_logger.info("MyAction: Doing something!")
+```
+
 # Final Words
 
 This post evolves as I evolve. I will continuously refine and expand it as I deepen my understanding. Feedback and suggestions are always welcome!
@@ -1414,8 +1449,9 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.7   | 2025-08-05 | - Added Logging in ROS2 Section<br>- Updated Application Class Structure ans Responsabillities section                                                               |
 | 1.1.6   | 2025-08-05 | - Updated Application Class Structure and Responsabilities section<br>- Updated Entry Point Section                                                                  |
-| 1.1.5   | 2025-08-01 | Added Installing py_trees_ros for ROS 2 section                                                                                                                      |
+| 1.1.5   | 2025-08-01 | Added Installing py_trees_ros for ROS2 section                                                                                                                       |
 | 1.1.4   | 2025-07-31 | Added Setting Conditions via Console section                                                                                                                         |
 | 1.1.3   | 2025-07-29 | - Corrected error in Creating a New Package section<br>- Added Usage of  ament_cmake section                                                                         |
 | 1.1.2   | 2025-07-28 | - Added Setting Conditions through Console via ROS2 Services section                                                                                                 |
