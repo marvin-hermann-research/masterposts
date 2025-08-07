@@ -637,7 +637,7 @@ This implementation introduces a modular and scalable YAML-based motion executio
 The functionality is split across four methods:
 
 1. **`__init__()`**  
-    At initialization, a pattern index file (`patterns.yaml`) is parsed into a dictionary `self._patterns`, mapping behavior names (e.g., `"walk_forward"`, `"idle"`) to the corresponding YAML file paths. A periodic timer (`~20 Hz`) is also created to enable real-time motion sequencing
+    At initialization, a pattern index file (`patterns.yaml`) is parsed into a dictionary `self._patterns`, mapping behavior names (e.g., `"walk_forward"`, `"idle"`) to the corresponding YAML file paths. This pattern index file must first be loaded from the package share directory. A periodic timer (`~20 Hz`) is also created to enable real-time motion sequencing
     
 2. **`_walk_forward_callback()`**  
     This method is triggered when the `WalkForwardBehaviour` BT node becomes active. It delegates execution to `_load_and_start_pattern()` by passing the name `"walk_forward"`
@@ -653,12 +653,18 @@ The functionality is split across four methods:
 
 ```python
 import yaml
+from ament_index_python.packages import get_package_share_directory
+import os
 
 def __init__(self):
     super().__init__("movement_controller")
-        
+
+	# Load the patterns index from the package share directory
+	pkg_share = get_package_share_directory("bipedal_robot_pkg")
+	self._patterns_path = os.path.join(pkg_share, "behaviour_tree/patterns/all_patterns.yaml")
+
     # Load the pattern index which maps behavior names to motion YAML files
-    with open("patterns.yaml", "r") as file:
+    with open(self._patterns_path, "r") as file:
         self._patterns = yaml.safe_load(file)
 
     # Motion state
@@ -732,6 +738,39 @@ def _execute_joints(self, joints):
 
     self._left_leg_publisher.publish(left_msg)
     self._right_leg_publisher.publish(right_msg)
+```
+
+> Note to load in the yaml file from the package share directory. Only that way the ROS2 system is able to read relative file paths. Besides using the correct imports in the node class the yaml files must also be declared within the setup.py
+
+```python
+from setuptools import find_packages, setup
+
+package_name = 'bipedal_robot_pkg'
+
+setup(
+    name=package_name,
+    version='0.0.0',
+    packages=find_packages(exclude=['test']),
+    # add package data for behaviour tree patterns
+    package_data={
+        package_name: [
+            'behaviour_tree/patterns/*.yaml',
+        ]
+    },
+    data_files=[
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+		# copy all YAML files into the share directory
+        ('share/' + package_name + "INSERT FOLDER LOCATION",
+            [
+                'bipedal_robot_pkg/behaviour_tree/patterns/patterns.yaml',
+				# ...other yaml files...
+            ]
+        )
+    ],
+    # ...existing code...
+)
 ```
 
 ## Implementing Py_trees Nodes in Ros
@@ -819,6 +858,7 @@ class CanWalkEvaluator(Node):
 	        key="can_walk",
 	        access=py_trees.common.Access.WRITE
 	    )
+		self.bb.can_walk = False # Initialize can_walk to False
 
     def _init_subscribers(self):
         self._imu_sensor_subscriber = self.create_subscription(
@@ -855,6 +895,7 @@ class CanWalkEvaluator(Node):
         return
 ```
 
+> It is critical to set the Blackboard Writer directily after registering it. This ensures that the key is always initialized.
 ### Setting Conditions via Console
 
 Publishing messages to a ROS2 topic via the console enables dynamic control of behavior tree conditions at runtime.  For this usecase an **Evaluator Class** can be used
@@ -1449,7 +1490,8 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.1.7   | 2025-08-05 | - Added Logging in ROS2 Section<br>- Updated Application Class Structure ans Responsabillities section                                                               |
+| 1.1.8   | 2025-08-05 | - Updated Using YAML section<br>- Updated Condition Node Setup section                                                                                               |
+| 1.1.7   | 2025-08-05 | - Added Logging in ROS2 section<br>- Updated Application Class Structure ans Responsabillities section                                                               |
 | 1.1.6   | 2025-08-05 | - Updated Application Class Structure and Responsabilities section<br>- Updated Entry Point Section                                                                  |
 | 1.1.5   | 2025-08-01 | Added Installing py_trees_ros for ROS2 section                                                                                                                       |
 | 1.1.4   | 2025-07-31 | Added Setting Conditions via Console section                                                                                                                         |
