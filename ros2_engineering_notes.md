@@ -1072,6 +1072,11 @@ class BehaviorTreeApp(Node):
         for node in self.nodes.values():
             self.executor.add_node(node)
 
+		if self._tree.node is None:
+			self.get_logger().error("BehaviourTree node is None after setup!")
+		else:
+			self._executor.add_node(self._tree.node)
+
     # === 6. Launch the system loop ===
     def run(self):
         try:
@@ -1118,14 +1123,21 @@ As a result, the tree becomes fully integrated into the ROS runtime and is ticke
 
 The executor is responsible for managing the callback queue, which includes all timers, subscriptions, and service callbacks registered by the nodes
 
+It is also necessary to add the Behavior Tree’s ROS node to the executor. This ensures that the Behavior Tree itself is properly spun alongside its tick-tock mechanism
+
+```python
+if self._tree.node is None:
+	self.get_logger().error("BehaviourTree node is None after setup!")
+else:
+	self._executor.add_node(self._tree.node)
+```
+
 ROS 2 offers different types of executors:
 
 - **`SingleThreadedExecutor`**: processes callbacks sequentially, suitable for deterministic behavior
 - **`MultiThreadedExecutor`**: allows callbacks to be processed in parallel, enabling concurrency across nodes and their internal timers
 
 All registered nodes are added to the executor, which then handles all event-driven execution
-
-This means the `tick_tock(...)` based tree ticking is handled just like any other timer based ROS callback through the executor’s queue
 ## Entry Point
 
 To launch the complete system using `ros2 run`, a **standard Python `main()` function** must be defined **outside** the application class and properly registered in the `setup.py` file under `console_scripts`.
@@ -1490,8 +1502,9 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.1.8   | 2025-08-05 | - Updated Using YAML section<br>- Updated Condition Node Setup section                                                                                               |
-| 1.1.7   | 2025-08-05 | - Added Logging in ROS2 section<br>- Updated Application Class Structure ans Responsabillities section                                                               |
+| 1.1.9   | 2025-08-08 | Updated Application Class Structure and Responsabilities section                                                                                                     |
+| 1.1.8   | 2025-08-07 | - Updated Using YAML section<br>- Updated Condition Node Setup section                                                                                               |
+| 1.1.7   | 2025-08-06 | - Added Logging in ROS2 section<br>- Updated Application Class Structure ans Responsabillities section                                                               |
 | 1.1.6   | 2025-08-05 | - Updated Application Class Structure and Responsabilities section<br>- Updated Entry Point Section                                                                  |
 | 1.1.5   | 2025-08-01 | Added Installing py_trees_ros for ROS2 section                                                                                                                       |
 | 1.1.4   | 2025-07-31 | Added Setting Conditions via Console section                                                                                                                         |
