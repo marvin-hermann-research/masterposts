@@ -65,6 +65,11 @@
 -   [Logging in Ros2](#logging_in_ros_2)
 	- [Standard Console Logging](#standard_console_logging)
 	- [Logging of py_trees Nodes](#logging_of_py_trees_nodes)
+- [Scientific Logging](#scientific_logging)
+	- [Commonly Logged Information](#commonly_logged_information)
+	- [General Logging Structure](#general_logging_structure)
+		- [Logging Framework](#logging_framework)
+		- [Logger Factory Class](#logger_factory_class)
 - [Final Words](#final-words)
 - [Change Log](#change-log)
 
@@ -602,12 +607,13 @@ These YAMLs can be generated efficiently via machine learning. This can be consi
 `all_patterns.yaml`:
 
 ```yaml
-patterns:
-  walk_forward: "patterns/walk_forward.yaml"
-  arm_wave: "patterns/arm_wave.yaml"
+walk_forward: "walk_forward.yaml"
+arm_wave: "arm_wave.yaml"
 ```
 
 The main YAML is loaded by a node, and specific pattern YAMLs are loaded on demand.
+
+> Be sure that the patterns are in the same folder as the all_patterns.yaml
 
 ### YAML structure example
 
@@ -666,6 +672,13 @@ def __init__(self):
     # Load the pattern index which maps behavior names to motion YAML files
     with open(self._patterns_path, "r") as file:
         self._patterns = yaml.safe_load(file)
+
+	# Convert paths in absolute paths
+	base_dir = os.path.dirname(self._patterns_path)
+	self._patterns = {}
+	for name, rel_path in loaded_patterns.items():
+		abs_path = os.path.join(base_dir, rel_path)
+		self._patterns[name] = abs_path
 
     # Motion state
     self._current_pattern = None                # Currently loaded motion sequence
@@ -985,7 +998,7 @@ class TreeFactory:
         # Create root composite
         root = Selector(
 	        name="Locomotion Root",
-			memory=True)
+			memory=False)
 
         # Instantiate leaf nodes
         is_grounded = IsGroundedCondition()  # Static condition, no ROS2 needed
@@ -1492,6 +1505,138 @@ class MyAction(py_trees.behaviour.Behaviour):
         self.ros_logger.info("MyAction: Doing something!")
 ```
 
+# Scientific Logging
+
+The goal of scientific logging is to ensure that all critical information of an experiment is recorded in a way that makes evaluation **reproducible, convenient, and scientifically rigorous**
+Therefore, it is crucial to define in advance what exactly needs to be tracked
+
+### Commonly Logged Information
+
+- **System Status** (CPU, RAM, battery level, node heartbeat)
+- **Sensor Data** (IMU, LIDAR, battery)
+- **Decisions** (e.g., results of behavior tree evaluations such as `"mustWalk = True"`)
+- **Actions** (published commands, executed motion patterns)
+- **Errors / Failures** (unreachable topics, crashed publishers, exceptions)
+
+In general, it is best practice to define how logging is structured in a **logging concept file** This ensures consistency across experiments and allows for long-term reproducibility
+
+## General Logging Structure
+
+Logs should be **structured and machine-readable**. JSON is widely supported and therefore commonly used in robotics research. A typical log entry might look like this:
+
+```json
+{
+  "timestamp": "2025-08-17T12:34:56.123Z",
+  "node": "MovementControllerNode",
+  "level": "INFO",
+  "event": "walk_command_sent",
+  "data": {
+    "pattern": "walk_forward_pattern.yaml",
+    "speed": 0.5,
+    "direction": "forward"
+  }
+}
+```
+
+**Fields explained:**
+
+- `timestamp`: UTC in ISO-8601 format for cross-node synchronization
+- `node`: the ROS2 node or module emitting the log
+- `level`: severity level (DEBUG, INFO, WARNING, ERROR)
+- `event`: short identifier of what happened
+- `data`: structured dictionary containing event-specific parameters
+
+## Logging Framework
+
+For Python-based ROS2 nodes, the **standard `logging` module** in combination with `python-json-logger` is recommended.  
+This allows for structured JSON logging while still supporting features like log rotation
+
+Instead of configuring logging individually in each node, a **centralized logger class** should be implemented. Nodes and components can then instantiate their logger via this class, ensuring a uniform format
+
+### Logger Factory Class
+
+```python
+import logging
+from logging.handlers import RotatingFileHandler
+from pythonjsonlogger import jsonlogger
+from datetime import datetime, timezone
+
+class ScientificLogger:
+    """
+    ScientificLogger provides a unified JSON-based logging interface
+    for all ROS2 nodes and components. Logs follow a fixed schema:
+
+    {
+      "timestamp": "...",
+      "node": "...",
+      "level": "...",
+      "event": "...",
+      "data": {...}
+    }
+    """
+
+    def __init__(self, node_name: str, log_file: str = "robot_log.json"):
+        self.node_name = node_name
+        self.logger = logging.getLogger(node_name)
+        self.logger.setLevel(logging.INFO)
+
+        # Prevent duplicate handlers if logger is reused
+        if not self.logger.handlers:
+            handler = RotatingFileHandler(
+                log_file, maxBytes=5 * 10**6, backupCount=5, encoding="utf-8"
+            )
+
+            # jsonlogger will serialize `extra` fields automatically
+            formatter = jsonlogger.JsonFormatter()
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+
+    def log(self, level: str, event: str, data: dict):
+        """
+        Create a structured log entry.
+
+        Args:
+            level (str): One of ["DEBUG", "INFO", "WARNING", "ERROR"]
+            event (str): Short identifier for the log event
+            data (dict): Additional structured information
+        """
+        log_method = getattr(self.logger, level.lower(), self.logger.info)
+
+        log_method(
+            event,
+            extra={
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "node": self.node_name,
+                "level": level.upper(),
+                "event": event,
+                "data": data
+            },
+        )
+```
+
+Usage in a ROS2 node:
+
+```python
+# MovementControllerNode
+from logger_factory import ScientificLogger
+
+logger = ScientificLogger("MovementControllerNode")
+
+# Log an INFO event
+logger.log(
+    "INFO",
+    "walk_command_sent",
+    {"pattern": "walk_forward_pattern.yaml", "speed": 0.5, "direction": "forward"}
+)
+
+# Log an ERROR event
+logger.log(
+    "ERROR",
+    "actuator_failure",
+    {"leg": "left", "error_code": 42}
+)
+```
+
 # Final Words
 
 This post evolves as I evolve. I will continuously refine and expand it as I deepen my understanding. Feedback and suggestions are always welcome!
@@ -1502,6 +1647,8 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.2.0   | 2025-08-11 | Added Scientific Logging section                                                                                                                                     |
+| 1.1.10  | 2025-08-11 | - Updated Motion Sequence YAMLs section<br>- Updated Using YAML section                                                                                              |
 | 1.1.9   | 2025-08-08 | Updated Application Class Structure and Responsabilities section                                                                                                     |
 | 1.1.8   | 2025-08-07 | - Updated Using YAML section<br>- Updated Condition Node Setup section                                                                                               |
 | 1.1.7   | 2025-08-06 | - Added Logging in ROS2 section<br>- Updated Application Class Structure ans Responsabillities section                                                               |
