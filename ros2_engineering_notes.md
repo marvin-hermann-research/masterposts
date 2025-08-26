@@ -42,34 +42,32 @@
 	- [Setting Conditions via Console](#setting-conditions-via-console)
 - [Action Node Setup](#action-node-setup)
 - [Tree Factory Setup in ROS2](#tree-factory-setup-in-ros2)
+  - [Key Concepts](#key-concepts)	
   - [Example: Locomotion Subtree](#example-locomotion-subtree)
-- [Application Class-Based Initialization of ROS 2 Systems](#application-class-based-initialization-of-ros-2-systems)
-	- [Installing py_trees_ros for ROS 2 ](#installing-py-trees-ros-for-ros-2)
-	- [Application Class Structure and Responsibilities](#application-class-structure-and-responsibilities)
-	- [Detailed Explanation](#detailed-explanation)
-    - [Wrapping the Behavior Tree in a ROS 2-Compatible Structure](#wrapping-the-behavior-tree-in-a-ros-2-compatible-structure)
-    - [Registering Nodes with the ROS 2 Executor](#registering-nodes-with-the-ros-2-executor)
+- [Application Class-Based Initialization of ROS 2 Systems](#application-class-based-initialization-of-ros2-systems)
+	- [Installing py_trees_ros for ROS2](#installing-py_trees_ros-for-ros2)
+	- [Application Class Structure and Responsabilities](#application-class-structure-and-responsabilities)
+	- [Further Explaination](#further-explaination)
 - [Entry Point](#entry-point)
 - [Usage of `ament_cmake`](#usage-of-ament_cmake)
-  - [Migrating from `ament_python` to `ament_cmake`](#migrating-from-ament_python-to-ament_cmake)
+  - [Migrating a package from ament_python to ament_cmake](#migrating-a-package-from-ament_python-to-ament_cmake)
   - [Example Conversion](#example-conversion)
     - [`setup.py` (Before Migration)](#setuppy-before-migration)
-    - [Executable Rights for Python Scripts](#executable-rights-for-python-scripts)
-      - [Option 1 – With Git](#option-1--with-git)
-      - [Option 2 – Without Git](#option-2--without-git)
+      - [Option 1 – If Git is used](#option-1--if-git-is-used)
+      - [Option 2 – If no Git is used](#option-2--if-no-git-is-used)
     - [Final `CMakeLists.txt` (After Migration)](#final-cmakeliststxt-after-migration)
-- [Setting Conditions via Console Using ROS 2 Services](#setting-conditions-via-console-using-ros-2-services)
-  - [ROS 2 Service Setup](#ros-2-service-setup)
+- [Setting Conditions via Console Using ROS 2 Services](#setting-conditions-through-console-via-ros2-services)
+  - [ROS 2 Service Setup](#ros2-service-setup)
   - [Runtime Usage from Console](#runtime-usage-from-console)
   - [Required Package Configuration](#required-package-configuration)
--   [Logging in Ros2](#logging_in_ros_2)
-	- [Standard Console Logging](#standard_console_logging)
-	- [Logging of py_trees Nodes](#logging_of_py_trees_nodes)
-- [Scientific Logging](#scientific_logging)
-	- [Commonly Logged Information](#commonly_logged_information)
-	- [General Logging Structure](#general_logging_structure)
-		- [Logging Framework](#logging_framework)
-		- [Logger Factory Class](#logger_factory_class)
+-   [Logging in Ros2](#logging-in-ros2)
+	- [Standard Console Logging](#standard-console-logging)
+	- [Logging of py_trees Nodes](#logging-of-py_trees-nodes)
+- [Scientific Logging](#scientific-logging)
+	- [Commonly Logged Information](#commonly-logged-information)
+	- [General Logging Structure](#general-logging-structure)
+		- [Logging Framework](#logging-framework)
+		- [Logger Factory Class](#logger-factory-class)
 - [Final Words](#final-words)
 - [Change Log](#change-log)
 
@@ -471,7 +469,7 @@ Created when the action server is instantiated. Includes 4 subtopics:
 
 => There is no need for manual topic subscription; communication is handled through `ActionClient` and `ActionServer` interfaces
 
-#### Using Action Nodes
+#### Using Action Nodes (Client Side)
 
 Conventionally, a regular node creates a **Goal** and sends it to the action node via the **ActionClient** using `send_goal_async()`, waiting for the response.
 
@@ -1018,7 +1016,7 @@ While this architectural pattern is not inherently tied to the use of behavior t
 
 I introduce this concept at this stage because my primary use case focuses on the integration of `py_trees` within ROS2 systems, where the application class serves as a cohesive entry point for both robotic control logic and behavior orchestration
 
-### Installing py_trees_ros for ROS 2
+### Installing py_trees_ros for ROS2
 
 The `py_trees_ros` package provides ROS 2–specific extensions and behavior tree utilities for the `py_trees` framework. Despite some tutorials referring to a module named `py_trees_ros2`, **no such package exists**, all ROS 2 functionality is included within `py_trees_ros` version 2.x and above
 
@@ -1184,7 +1182,7 @@ ROS 2 offers different types of executors:
 
 All registered nodes are added to the executor, which then handles all event-driven execution
 
-## Usage of  ament_cmake
+## Usage of ament_cmake
 
 As mentioned before, in ROS 2, packages can be built using either `ament_python` or `ament_cmake` as their build system
 
@@ -1647,6 +1645,7 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.2.1   | 2025-08-12 | Fixed TOC                                                                                                                                                            |
 | 1.2.0   | 2025-08-11 | Added Scientific Logging section                                                                                                                                     |
 | 1.1.10  | 2025-08-11 | - Updated Motion Sequence YAMLs section<br>- Updated Using YAML section                                                                                              |
 | 1.1.9   | 2025-08-08 | Updated Application Class Structure and Responsabilities section                                                                                                     |
