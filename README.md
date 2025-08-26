@@ -9,11 +9,11 @@ They are designed as long-term references, learning logs, and documentation of p
 
 ## Index
 
-### 🔹 [ROS Masterpost](./ros2_engineering_notes.md)  
-A deep dive into the Robot Operating System (ROS2): architecture, node lifecycle, message types, practical examples, and development patterns.
+### - [ROS2 Masterpost](./ros2_engineering_notes.md)  
+A deep dive into the Robot Operating System (ROS2): architecture, node lifecycle, Behaviour Trees, practical examples, and development patterns.
 
-### 🔹 [Python Masterpost](./python_for_robotic_engineering.md)  
-Foundational Python knowledge for scientific programming and robotics: idioms, design patterns, tools, and real-world code snippets.
+### - [Python Masterpost](./python_for_robotic_engineering.md)  
+Foundational Python knowledge for scientific programming and robotics: idioms, design patterns, tools, and code snippets.
 
 ---
 
@@ -24,7 +24,6 @@ Foundational Python knowledge for scientific programming and robotics: idioms, d
 - Each post includes:
   - Definitions and core concepts
   - Practical use-cases or implementation notes
-  - Links to source material (papers, docs, RFCs, etc.)
   - Personal reflections or learning outcomes where relevant
 
 ---
