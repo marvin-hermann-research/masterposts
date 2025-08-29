@@ -9,10 +9,10 @@ They are designed as long-term references, learning logs, and documentation of p
 
 ## Index
 
-### - [ROS2 Masterpost](./ros2_engineering_notes.md)  
+### [ROS2 Masterpost](./ros2_engineering_notes.md)  
 A deep dive into the Robot Operating System (ROS2): architecture, node lifecycle, Behaviour Trees, practical examples, and development patterns.
 
-### - [Python Masterpost](./python_for_robotic_engineering.md)  
+### [Python Masterpost](./python_for_robotic_engineering.md)  
 Foundational Python knowledge for scientific programming and robotics: idioms, design patterns, tools, and code snippets.
 
 ---
