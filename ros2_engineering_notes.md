@@ -68,6 +68,14 @@
 	- [General Logging Structure](#general-logging-structure)
 		- [Logging Framework](#logging-framework)
 		- [Logger Factory Class](#logger-factory-class)
+- [Micro ROS Setup on ESP32](#micro-ros-setup-on-esp32) 
+	- [Initialization Process](#initialization-process)
+	- [Firmware and Data Exchange Configuration](#firmware-and-data-exchange-configuration)
+		- [Wired Connection via Serial](#wired-connection-via-serial)
+		- [Wireless Connection](#wireless-connection)
+	- [Building and Flashing Firmware](#building-and-flashing-firmware)
+	- [Creating a Micro ROS Agent](#creating-a-micro-ros-agent)
+	-  [Starting a Micro ROS Application on ESP32](#starting-a-micro-ros-application-on-esp32)
 - [Final Words](#final-words)
 - [Change Log](#change-log)
 
@@ -1635,6 +1643,115 @@ logger.log(
 )
 ```
 
+# Micro ROS Setup on ESP32
+
+This section provides a step-by-step guide to setting up micro-ROS on an ESP32 using FreeRTOS. It covers workspace initialization, firmware configuration, flashing, and creating a micro-ROS Agent
+
+## Initialization Process
+
+```bash
+# Source ROS 2
+source /opt/ros/humble/setup.bash
+
+# Create a new workspace
+mkdir -p microros_ws/src
+cd microros_ws/src
+
+# Clone the micro_ros_setup repository
+git clone -b humble https://github.com/micro-ROS/micro_ros_setup.git
+cd ..
+
+# Install dependencies
+sudo apt update && rosdep update
+rosdep install --from-paths src --ignore-src -y
+
+# Install Python pip (if not already installed)
+sudo apt install python3-pip
+
+# Install vcstool
+sudo apt install python3-vcstool
+
+# Build the workspace
+colcon build
+source install/local_setup.bash
+
+# Create a firmware workspace for ESP32 + FreeRTOS
+ros2 run micro_ros_setup create_firmware_ws.sh freertos esp32
+```
+
+## Firmware and Data Exchange Configuration
+### Wired Connection via Serial
+
+To communicate with the ESP32 via USB, first identify which serial port the device is attached to:
+
+```bash
+journalctl -kf | grep tty
+```
+
+This command should produce output similar to:
+```bash
+Nov 17 09:49:43 pneuma-pop kernel: usb 3-2: cp210x converter now attached to ttyUSB0
+```
+
+In this example, the ESP32 is connected via `/dev/ttyUSB0`
+
+Next, configure the firmware of your desired application. In this example, the **`ping_pong`** demo is used, but it can be replaced with a custom application. Use the following command in the sourced workspace:
+
+```bash
+ros2 run micro_ros_setup configure_firmware.sh ping_pong -t serial -d /dev/ttyUSB0
+```
+
+**Notes:**
+- `-t serial` specifies that communication is via USB/serial
+- `-d /dev/ttyUSB0` indicates the device path
+- If using a custom application, replace `ping_pong` with the target app name and ensure it is available in the firmware source folder
+
+### Wireless Connection
+TODO
+
+## Building and Flashing Firmware
+
+```
+# Build step
+ros2 run micro_ros_setup build_firmware.sh
+source install/local_setup.bash
+
+# Flash step
+# Ensure proper access to the USB port
+sudo chmod a+rw /dev/ttyUSB0
+
+# flash proccess
+ros2 run micro_ros_setup flash_firmware.sh
+```
+
+## Creating a Micro ROS Agent
+
+```
+# Create agent workspace
+ros2 run micro_ros_setup create_agent_ws.sh
+colcon build --meta src
+source install/local_setup.sh
+
+# Run the agent
+ros2 run micro_ros_agent micro_ros_agent [parameters]
+```
+
+**Example for serial connection:**
+
+```bash
+ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0
+```
+
+## Starting a Micro ROS Application on ESP32
+
+It is crucial to start the micro-ROS Agent **before** powering or resetting the ESP32. This ensures that the handshake between the agent and microcontroller occurs successfully.
+
+**Recommended workflow:**
+
+1. Start the micro-ROS Agent.
+2. Press the **reset button** on the ESP32.
+3. The micro-ROS application will begin communicating with ROS 2.
+
 # Final Words
 
 This post evolves as I evolve. I will continuously refine and expand it as I deepen my understanding. Feedback and suggestions are always welcome!
@@ -1645,6 +1762,7 @@ This post evolves as I evolve. I will continuously refine and expand it as I dee
 
 | Version | Date       | Changes                                                                                                                                                              |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.2.2   | 2025-11-18 | Added Micro ROS Setup on ESP32 section                                                                                                                               |
 | 1.2.1   | 2025-08-12 | Fixed TOC                                                                                                                                                            |
 | 1.2.0   | 2025-08-11 | Added Scientific Logging section                                                                                                                                     |
 | 1.1.10  | 2025-08-11 | - Updated Motion Sequence YAMLs section<br>- Updated Using YAML section                                                                                              |
